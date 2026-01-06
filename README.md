@@ -6,8 +6,8 @@ Work in progress.
 1. Copy `.env.example` file to `.env`, and add your credentials, including token, channel ID, etc.
 3. Copy `reminder.example.json` to `reminder.json`. Add your custom reminder message to it, or change it later with a slash command.
 4. Create and activate a virtual environment:
-  1. `python -m venv .venv`
-  2. `source .venv/bin/activate`
+    1. `python -m venv .venv`
+    2. `source .venv/bin/activate`
 6. Install dependencies: `python -m pip install -r requirements.txt`
 7. Run the bot: `python bot.py`
 
