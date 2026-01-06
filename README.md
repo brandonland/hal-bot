@@ -15,7 +15,7 @@ For the moment, the reminder interval and time are hardcoded. The reminder time 
 
 ## Usage
 There are 3 slash commands:
-- `/getreminder`: This command privately echoes back what the reminder is set to. This is only visible to you.
+- `/seereminder`: This command privately echoes back what the reminder is set to. This is only visible to you.
 - `/setreminder <new_reminder>`: Replace <new_reminder> with any text to set the reminder to anything.
   - For example: `/setreminder hello` will set the reminder to "hello".
-- `/sayreminder`: This command manually forces the bot to speak its reminder in the channel. This is visible to everyone.
+- `/postreminder`: This command manually forces the bot to speak its reminder in the channel. This is visible to everyone.
