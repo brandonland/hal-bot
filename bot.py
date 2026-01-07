@@ -53,15 +53,16 @@ class Client(commands.Bot):
     
 
 intents = discord.Intents.default()
+intents.message_content = True
 client = Client(command_prefix="!", intents=intents)
 
-@tasks.loop(minutes=1) # Check every hour
+@tasks.loop(minutes=1) # Check every minute
 async def send_reminder():
     now = datetime.now(timezone.utc)  # Current UTC time
 
     if now.weekday() == 1:  # (0=Monday, 1=Tuesday, ...)
         time_to_send = now.replace(hour=17, minute=0, second=0, microsecond=0) # set to 17:00 UTC (noon EST)
-        if now >= time_to_send and now < time_to_send + timedelta(minutes=1):
+        if now >= time_to_send and now < time_to_send + timedelta(minutes=1): # sends the reminder *within the minute*
             channel = client.get_channel(CHANNEL_ID)
             if channel:
                 await channel.send(load_reminder())
