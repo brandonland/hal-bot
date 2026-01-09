@@ -81,14 +81,16 @@ class BaseModal(discord.ui.Modal):
 
 class ReminderSetModal(BaseModal, title="Set the reminder"):
     # reminder_title = discord.ui.TextInput(label="Reminder title", placeholder="Enter a message title (optional)", required=False, min_length=1, max_length=2000, style=discord.TextStyle.long)
-    reminder_msg = discord.ui.TextInput(
-        label="Reminder message body",
-        placeholder="Enter a new reminder message",
-        default=load_reminder(),
-        required=True, min_length=1,
-        max_length=2000,
-        style=discord.TextStyle.long
-    )
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.reminder_msg = discord.ui.TextInput(
+            label="Reminder message body",
+            placeholder="Enter a new reminder message",
+            required=True, min_length=1,
+            max_length=2000,
+            style=discord.TextStyle.long
+        )
+        self.add_item(self.reminder_msg)
     
     async def on_submit(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(
@@ -112,7 +114,9 @@ class ReminderCommandGroup(app_commands.Group):
 
     @app_commands.command(name="set", description="Set a new reminder message")
     async def reminder_set(self, interaction: discord.Interaction):
-        await interaction.response.send_modal(ReminderSetModal())
+        modal = ReminderSetModal()
+        modal.reminder_msg.default = load_reminder()
+        await interaction.response.send_modal(modal)
 
     @app_commands.command(name="post", description="Make the bot send the reminder as a message (⚠️ CAUTION! Visible to all! ⚠️)")
     async def reminder_post(self, interaction: discord.Interaction):
