@@ -52,9 +52,30 @@ class Client(commands.Bot):
         send_reminder.start()
     
 
+class ReminderCommandGroup(app_commands.Group):
+    def __init__(self):
+        super().__init__(name="reminder", description="Reminder commands", guild_ids=[GUILD_ID])
+        
+    @app_commands.command(name="view", description="Privately see the reminder message (only visible to you)")
+    async def reminder_view(self, interaction: discord.Interaction):
+        reminder = load_reminder()
+        await interaction.response.send_message(reminder, ephemeral=True)
+
+    @app_commands.command(name="set", description="Set a new reminder message")
+    @app_commands.describe(new_reminder="The new reminder message you want to set.")
+    async def reminder_set(self, interaction: discord.Interaction, new_reminder: str):
+        update_reminder(new_reminder)
+        await interaction.response.send_message(f"The reminder has been updated! The new reminder will appear as:\n{new_reminder}", ephemeral=True)
+
+    @app_commands.command(name="post", description="Make the bot send the reminder as a message (CAUTION! This is visible to all!)")
+    async def reminder_post(self, interaction: discord.Interaction):
+        reminder = load_reminder()
+        await interaction.response.send_message(reminder)
+
+
 intents = discord.Intents.default()
 intents.message_content = True
-client = Client(command_prefix="!", intents=intents)
+bot = Client(command_prefix="!", intents=intents)
 
 @tasks.loop(minutes=1) # Check every minute
 async def send_reminder():
@@ -67,20 +88,7 @@ async def send_reminder():
             if channel:
                 await channel.send(load_reminder())
 
-@client.tree.command(name="seereminder", description="See the reminder message (only visible to you)", guild=GUILD_OBJ)
-async def get_reminder(interaction: discord.Interaction):
-    reminder = load_reminder()
-    await interaction.response.send_message(reminder, ephemeral=True)
 
-@client.tree.command(name="postreminder", description="Make the bot say the reminder message (visible to all!)", guild=GUILD_OBJ)
-async def say_reminder(interaction: discord.Interaction):
-    reminder = load_reminder()
-    await interaction.response.send_message(reminder)
-
-@client.tree.command(name="setreminder", description="Set the reminder message", guild=GUILD_OBJ)
-async def set_reminder(interaction: discord.Interaction, new_reminder: str):
-    update_reminder(new_reminder)
-    await interaction.response.send_message(f"The reminder has been updated! The new reminder will appear as:\n{new_reminder} ", ephemeral=True)
-
-
-client.run(TOKEN)
+reminder_cmd = ReminderCommandGroup()
+bot.tree.add_command(reminder_cmd)
+bot.run(TOKEN)
