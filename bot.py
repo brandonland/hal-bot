@@ -67,7 +67,7 @@ class ReminderCommandGroup(app_commands.Group):
         update_reminder(new_reminder)
         await interaction.response.send_message(f"The reminder has been updated! The new reminder will appear as:\n{new_reminder}", ephemeral=True)
 
-    @app_commands.command(name="post", description="Make the bot send the reminder as a message (CAUTION! This is visible to all!)")
+    @app_commands.command(name="post", description="Make the bot send the reminder as a message (⚠️ CAUTION! Visible to all! ⚠️)")
     async def reminder_post(self, interaction: discord.Interaction):
         reminder = load_reminder()
         await interaction.response.send_message(reminder)
