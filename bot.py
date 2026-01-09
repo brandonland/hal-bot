@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import json
 import discord
@@ -5,6 +7,8 @@ from discord.ext import commands, tasks
 from discord import app_commands
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+
+import traceback
 
 load_dotenv()
 
@@ -51,6 +55,51 @@ class Client(commands.Bot):
             
         send_reminder.start()
     
+class BaseModal(discord.ui.Modal):
+    _interaction: discord.Interaction | None = None
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        # if not responded to, defer interaction
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+        self._interaction = interaction
+        self.stop()
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        message = f"An error occurred while processing the interaction:\n```py\n{tb}\n```"
+        try:
+            await interaction.response.send_message(message, ephemeral=True)
+        except:
+            await interaction.edit_original_response(content=message, view=None)
+        self.stop()
+        
+    @property
+    def interaction(self) -> discord.Interaction | None:
+        return self._interaction
+
+
+class ReminderSetModal(BaseModal, title="Set the reminder"):
+    # reminder_title = discord.ui.TextInput(label="Reminder title", placeholder="Enter a message title (optional)", required=False, min_length=1, max_length=2000, style=discord.TextStyle.long)
+    reminder_msg = discord.ui.TextInput(
+        label="Reminder message body",
+        placeholder="Enter a new reminder message",
+        default=load_reminder(),
+        required=True, min_length=1,
+        max_length=2000,
+        style=discord.TextStyle.long
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        embed = discord.Embed(
+            title="Reminder updated. The new reminder will appear as:",
+            description=self.reminder_msg.value,
+            color=discord.Color.blurple()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        update_reminder(self.reminder_msg.value)
+        await super().on_submit(interaction)
+        
 
 class ReminderCommandGroup(app_commands.Group):
     def __init__(self):
@@ -62,15 +111,15 @@ class ReminderCommandGroup(app_commands.Group):
         await interaction.response.send_message(reminder, ephemeral=True)
 
     @app_commands.command(name="set", description="Set a new reminder message")
-    @app_commands.describe(new_reminder="The new reminder message you want to set.")
-    async def reminder_set(self, interaction: discord.Interaction, new_reminder: str):
-        update_reminder(new_reminder)
-        await interaction.response.send_message(f"The reminder has been updated! The new reminder will appear as:\n{new_reminder}", ephemeral=True)
+    async def reminder_set(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(ReminderSetModal())
 
     @app_commands.command(name="post", description="Make the bot send the reminder as a message (⚠️ CAUTION! Visible to all! ⚠️)")
     async def reminder_post(self, interaction: discord.Interaction):
         reminder = load_reminder()
-        await interaction.response.send_message(reminder)
+        # await interaction.response.send_message(reminder)
+        embed = discord.Embed(description=reminder, color=discord.Color.blurple())
+        await interaction.response.send_message(embed=embed)
 
 
 intents = discord.Intents.default()
@@ -88,6 +137,9 @@ async def send_reminder():
             if channel:
                 await channel.send(load_reminder())
 
+@send_reminder.after_loop
+async def after_reminder():
+    print(f"Reminder sent automatically at {datetime.now(timezone.utc)} UTC time.\n\nReminder:\n{load_reminder()}")
 
 reminder_cmd = ReminderCommandGroup()
 bot.tree.add_command(reminder_cmd)
