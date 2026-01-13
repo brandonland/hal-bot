@@ -120,7 +120,7 @@ class ReminderCommandGroup(app_commands.Group):
         
     @app_commands.command(name="view", description="Privately see the reminder message (only visible to you)")
     async def reminder_view(self, interaction: discord.Interaction):
-        do_reminder(interaction, ephemeral=True)
+        await do_reminder(interaction, ephemeral=True)
 
     @app_commands.command(name="edit", description="Edit a new reminder message")
     async def reminder_edit(self, interaction: discord.Interaction):
@@ -130,7 +130,7 @@ class ReminderCommandGroup(app_commands.Group):
 
     @app_commands.command(name="post", description="Make the bot send the reminder as a message (⚠️ CAUTION! Visible to all! ⚠️)")
     async def reminder_post(self, interaction: discord.Interaction):
-        do_reminder(interaction)
+        await do_reminder(interaction)
 
 
 intents = discord.Intents.default()
