@@ -143,7 +143,7 @@ async def send_reminder():
     if now.weekday() == 1:  # (0=Monday, 1=Tuesday, ...)
         time_to_send = now.replace(hour=17, minute=0, second=0, microsecond=0) # set to 17:00 UTC (noon EST)
         if now >= time_to_send and now < time_to_send + timedelta(minutes=1): # sends the reminder *within the minute*
-            channel = client.get_channel(CHANNEL_ID)
+            channel = bot.get_channel(CHANNEL_ID)
             if channel:
                 reminder = load_reminder()
                 file = discord.File("uploads/dvduesday.jpg", filename="dvduesday.jpg")
