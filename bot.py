@@ -105,7 +105,14 @@ class ReminderSetModal(BaseModal, title="Set the reminder"):
         await interaction.response.send_message(embed=embed, ephemeral=True)
         update_reminder(self.reminder_msg.value)
         await super().on_submit(interaction)
-        
+
+
+async def do_reminder(inter: discord.Interaction, ephemeral=False):
+    reminder = load_reminder()
+    file = discord.File("uploads/reminder-banner.jpg", filename="reminder-banner.jpg")
+    embed = discord.Embed(description=reminder, color=discord.Color.random())
+    await inter.response.send_message(file=file, embed=embed, ephemeral=ephemeral)
+    
 
 class ReminderCommandGroup(app_commands.Group):
     def __init__(self):
@@ -113,23 +120,17 @@ class ReminderCommandGroup(app_commands.Group):
         
     @app_commands.command(name="view", description="Privately see the reminder message (only visible to you)")
     async def reminder_view(self, interaction: discord.Interaction):
-        reminder = load_reminder()
-        file = discord.File("uploads/dvduesday.jpg", filename="dvduesday.jpg")
-        embed = discord.Embed(description=reminder, color=discord.Color.random())
-        await interaction.response.send_message(file=file, embed=embed, ephemeral=True)
+        do_reminder(interaction, ephemeral=True)
 
-    @app_commands.command(name="set", description="Set a new reminder message")
-    async def reminder_set(self, interaction: discord.Interaction):
+    @app_commands.command(name="edit", description="Edit a new reminder message")
+    async def reminder_edit(self, interaction: discord.Interaction):
         modal = ReminderSetModal()
         modal.reminder_msg.default = load_reminder()
         await interaction.response.send_modal(modal)
 
     @app_commands.command(name="post", description="Make the bot send the reminder as a message (⚠️ CAUTION! Visible to all! ⚠️)")
     async def reminder_post(self, interaction: discord.Interaction):
-        reminder = load_reminder()
-        file = discord.File("uploads/dvduesday.jpg", filename="dvduesday.jpg")
-        embed = discord.Embed(description=reminder, color=discord.Color.random())
-        await interaction.response.send_message(file=file, embed=embed) 
+        do_reminder(interaction)
 
 
 intents = discord.Intents.default()
@@ -146,9 +147,9 @@ async def send_reminder():
             channel = bot.get_channel(CHANNEL_ID)
             if channel:
                 reminder = load_reminder()
-                file = discord.File("uploads/dvduesday.jpg", filename="dvduesday.jpg")
+                file = discord.File("uploads/reminder-banner.jpg", filename="reminder-banner.jpg")
                 embed = discord.Embed(description=reminder, color=discord.Color.random())
-                await channel.send(load_reminder())
+                await channel.send(file=file, embed=embed)
 
 @send_reminder.after_loop
 async def after_reminder():
