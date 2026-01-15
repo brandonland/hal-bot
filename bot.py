@@ -24,8 +24,9 @@ REMINDER_BANNER_PATH_ABS = os.path.join(os.path.dirname(__file__), REMINDER_BANN
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(intents=intents)
-reminder = bot.create_group("reminder", "Reminder commands")
 
+reminder = bot.create_group("reminder", "Reminder commands", guild_ids=[GUILD_ID])
+reminder_edit = reminder.subgroup("edit", "Edit reminder", guild_ids=[GUILD_ID])
 
 def init_reminder():
     if not os.path.exists(REMINDER_PATH):
@@ -53,10 +54,12 @@ def update_reminder(message):
 async def send_reminder(
     ctx: discord.ApplicationContext = None,
     *,
+    inter: discord.Interaction = None,
     reminder=None,
     ephemeral=False,
     automatic=False,
     channel=None,
+    followup=False,
 ):
     if not reminder:
         reminder = load_reminder()
@@ -65,30 +68,47 @@ async def send_reminder(
     embed = discord.Embed(description=reminder, color=discord.Color.random())
     embed.set_image(url="attachment://reminder-banner.jpg")
 
-    if not automatic and ctx is not None:
-        await ctx.respond(embed=embed, file=file, ephemeral=ephemeral)
+    if not automatic:
+        if not followup and ctx is not None:
+            print("not followup and ctx")
+            await ctx.respond(embed=embed, file=file, ephemeral=ephemeral)
+        elif not followup and inter is not None:
+            print("not followup and inter")
+            await inter.respond(embed=embed, file=file, ephemeral=ephemeral)
+        elif followup and ctx:
+            print("followup and ctx")
+            await ctx.send_followup(embed=embed, file=file, ephemeral=ephemeral)
+        elif followup and inter:
+            print("followup and inter")
+            await inter.followup.send(embed=embed, file=file, ephemeral=ephemeral)
     elif automatic and channel is not None:
         await channel.send(embed=embed, file=file)
 
 
 class ReminderEditModal(discord.ui.DesignerModal):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, img_only=False, msg_only=False, *args, **kwargs) -> None:
+        if img_only:
+            print("image only!")
+        elif msg_only:
+            print("message only!")
+
         text_input = discord.ui.Label(
             "Reminder message body",
             discord.ui.TextInput(
+                value=load_reminder(),
                 placeholder="Create/edit your reminder message",
                 required=False,
                 style=discord.InputTextStyle.long,
             ),
         )
-        # TODO: pre-populate default value with the reminder message
+
         image_file = discord.ui.Label(
-            "Upload a banner image",
+            "Upload a banner image (Optional)",
             discord.ui.FileUpload(
                 max_values=1,
                 required=False,
             ),
-            description="This is the large banner image for the reminder.",
+            description="If you already uploaded an image, ignore this.",
         )
         super().__init__(
             text_input,
@@ -99,8 +119,8 @@ class ReminderEditModal(discord.ui.DesignerModal):
 
     async def callback(self, inter: discord.Interaction):
         await inter.response.defer()
+        await inter.followup.send("Reminder Set. Preview below:")
         embed = discord.Embed(
-            title="Reminder Set! Preview below:",
             description=self.children[0].item.value,
             color=discord.Color.random(),
         )
@@ -108,16 +128,15 @@ class ReminderEditModal(discord.ui.DesignerModal):
             self.children[1].item.values[0] if self.children[1].item.values else None
         )
         if attachment:  # Only save to disk if a file was uploaded
-            # print(f"attachment.filename is {attachment.filename}")
             await attachment.save(REMINDER_BANNER_PATH_ABS)
-            embed.set_image(url=f"attachment://{attachment.filename}")
 
         # Preview embed
-        await inter.followup.send(
-            embeds=[embed],
-            files=[await attachment.to_file()] if attachment else [],
-            ephemeral=True,
-        )
+        # await inter.followup.send(
+        #     embeds=[embed],
+        #     files=[await attachment.to_file()] if attachment else [],
+        #     ephemeral=True,
+        # )
+        await send_reminder(inter=inter, followup=True, ephemeral=True)
 
 
 @bot.event
@@ -134,25 +153,30 @@ async def on_ready():
 @reminder.command(
     name="view",
     description="(Only visible to you) See the reminder message",
-    guild_ids=[GUILD_ID],
 )
 async def reminder_view(ctx: discord.ApplicationContext):
     await send_reminder(ctx, ephemeral=True)
 
 
 @reminder.command(
-    name="edit", description="Edit a new reminder message", guild_ids=[GUILD_ID]
+    name="edit", description="Edit a new reminder message"
 )
-async def reminder_edit(ctx: discord.ApplicationContext):
-    modal = ReminderEditModal(title="Edit the reminder message")
-    await ctx.send_modal(modal)
+async def reminder_edit(ctx: discord.ApplicationContext, image: discord.Attachment=None):
+    if image:
+        # file = await image.to_file()
+        await image.save(REMINDER_BANNER_PATH_ABS)
+        await ctx.respond("Image uploaded! Here is a private preview:", ephemeral=True)
+        await send_reminder(ctx, followup=True, ephemeral=True)
+    else:
+        modal = ReminderEditModal(title="Edit the reminder")
+        await ctx.send_modal(modal)
+
 
 
 # TODO: have a confirm/prompt modal: "Are you sure you want to...?"
 @reminder.command(
     name="post",
     description="Manually announce the reminder in this channel (⚠️ CAUTION! Visible to all! ⚠️)",
-    guild_ids=[GUILD_ID],
 )
 async def reminder_post(ctx: discord.ApplicationContext):
     await send_reminder(ctx)
