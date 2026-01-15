@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 import os
+import asyncio
 import json
 import discord
 from discord.ext import commands, tasks
-from discord import app_commands
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
@@ -16,10 +14,14 @@ TOKEN = os.getenv("TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 GUILD_OBJ = discord.Object(id=GUILD_ID)
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-
 # UPLOADS_PATH = os.path.join(os.path.dirpath())
 REMINDER_PATH = os.path.join(os.path.dirname(__file__), 'reminder.json')
 EXAMPLE_REMINDER_PATH = os.path.join(os.path.dirname(__file__), 'reminder.example.json')
+
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(intents=intents)
+reminder = bot.create_group("reminder", "Reminder commands")
 
 def init_reminder():
     if not os.path.exists(REMINDER_PATH):
@@ -41,122 +43,157 @@ def update_reminder(message):
     with open('reminder.json', 'w') as f:
         json.dump(data, f, indent=4)
 
-class Client(commands.Bot):
-    async def on_ready(self):
-        init_reminder()
-        channel = self.get_channel(CHANNEL_ID)
-        print(f'Logged in as {self.user}!')
-        print(f'Current reminder: {load_reminder()}')
+async def send_reminder(ctx: discord.ApplicationContext=None, *, reminder=None, ephemeral=False, automatic=False, channel=None):
+    if not reminder:
+        reminder = load_reminder()
 
-        if not channel:
-            print('Error: channel not found!')
+    # file = discord.File("uploads/reminder-banner.jpg", filename="reminder-banner.jpg")
+    image = discord.EmbedMedia("uploads/reminder-banner.jpg")
+    embed = discord.Embed(description=reminder, image=image, color=discord.Color.random())
 
-        try:
-            synced = await self.tree.sync(guild=GUILD_OBJ)
-            print(f'Synced {len(synced)} commands to guild {GUILD_OBJ.id}')
-        except Exception as e:
-            print(f'Error occurred while syncing commands: {e}')
-            
-        send_reminder.start()
-
-        # for testing
-        send_reminder(automatic=True, channel=channel)
-    
-# class BaseModal(discord.ui.Modal):
-#     _interaction: discord.Interaction | None = None
-
-#     async def on_submit(self, interaction: discord.Interaction) -> None:
-#         # if not responded to, defer interaction
-#         if not interaction.response.is_done():
-#             await interaction.response.defer()
-#         self._interaction = interaction
-#         self.stop()
-
-#     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
-#         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-#         message = f"An error occurred while processing the interaction:\n```py\n{tb}\n```"
-#         try:
-#             await interaction.response.send_message(message, ephemeral=True)
-#         except:
-#             await interaction.edit_original_response(content=message, view=None)
-#         self.stop()
-        
-#     @property
-#     def interaction(self) -> discord.Interaction | None:
-#         return self._interaction
-
-
-class ReminderEditModal(discord.ui.Modal, title="Set the reminder"):
-    # reminder_title = discord.ui.TextInput(label="Reminder title", placeholder="Enter a message title (optional)", required=False, min_length=1, max_length=2000, style=discord.TextStyle.long)
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.reminder_textarea = discord.ui.TextInput(
-            label="Reminder message body",
-            placeholder="Enter a new reminder message",
-            required=True, min_length=1,
-            # max_length=2000,
-            style=discord.InputTextStyle.long
-        )
-        self.add_item(self.reminder_textarea)
-    
-    async def on_submit(self, interaction: discord.Interaction) -> None:
-        embed = discord.Embed(
-            title="Reminder updated. The new reminder will appear as:",
-            description=self.reminder_textarea.value,
-            color=discord.Color.random()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-        update_reminder(self.reminder_textarea.value)
-        await super().on_submit(interaction)
-
-
-async def send_reminder(ctx: discord.ApplicationContext=None, *, ephemeral=False, automatic=False, channel=None):
-    reminder = load_reminder()
-    file = discord.File("uploads/reminder-banner.jpg", filename="reminder-banner.jpg")
-    embed = discord.Embed(description=reminder, color=discord.Color.random())
     if not automatic and ctx is not None:
-        await ctx.respond(file=file, embed=embed, ephemeral=ephemeral)
+        # await ctx.respond(file=file, embed=embed, ephemeral=ephemeral)
+        await ctx.respond(embed=embed, ephemeral=ephemeral)
     elif automatic and channel is not None:
-        await channel.send(file=file, embed=embed)
+        await channel.send(embed=embed)
+
+# class ReminderEditModal(discord.ui.Modal):
+#     def __init__(self, *args, **kwargs) -> None:
+#         super().__init__(*args, **kwargs)
+#         self.reminder_textarea = discord.ui.TextInput(
+#             label="Reminder message body",
+#             placeholder="Enter a new reminder message",
+#             required=True, min_length=1,
+#             # max_length=2000,
+#             style=discord.InputTextStyle.long
+#         )
+#         self.add_item(self.reminder_textarea)
     
+#     async def callback(self, interaction: discord.Interaction):
+#         embed = discord.Embed(
+#             title="A private view of the reminder:",
+#             description=self.reminder_textarea.value,
+#             color=discord.Color.random()
+#         )
+#         await interaction.response.send_message(embeds=[embed], ephemeral=True)
+#         update_reminder(self.reminder_textarea.value)
 
-reminder = bot.create_group("reminder", "Reminder commands")
+class ReminderEditModal(discord.ui.DesignerModal):
+    def __init__(self, *args, **kwargs) -> None:
+        text_input = discord.ui.Label(
+            "Reminder message body",
+            discord.ui.TextInput(
+                placeholder="Create/edit your reminder message",
+                required=False,
+                style=discord.InputTextStyle.long,
+            )
+        )
+        image_file = discord.ui.Label(
+            "Upload a banner image",
+            discord.ui.FileUpload(
+                max_values=1,
+                required=False,
+            ),
+            description="This is the large banner image for the reminder."
+        )
+        super().__init__(
+            text_input,
+            image_file,
+            *args,
+            **kwargs,
+        )
+        
+    async def callback(self, inter: discord.Interaction):
+        await inter.response.defer()
+        embed = discord.Embed(
+            title="Reminder Set! Preview below:",
+            description=self.children[0].item.value,
+            # fields=[
+            #     discord.EmbedField(
+            #         name="",
+            #         value=self.children[0].item.value,
+            #         inline=False,
+            #     ),
+            # ],
+            color=discord.Color.random(),
+        )
+        attachment = (
+            self.children[1].item.values[0] if self.children[1].item.values else None
+        )
+        if attachment:
+            embed.set_image(url=f"attachment://{attachment.filename}")
+        await inter.followup.send(
+            embeds=[embed],
+            files=[await attachment.to_file()] if attachment else [],
+            ephemeral=True,
+        )
 
-@reminder.command(name="view", description="Privately see the reminder message (only visible to you)")
+
+# class ReminderUploadImageView(discord.ui.DesignerView):
+#     @discord.ui.file_upload(max_values=1)
+#     async def img_upload(self):
+#         pass
+
+# class MyView(discord.ui.View):
+#     @discord.ui.button(label="click!", style=discord.ButtonStyle.primary)
+
+
+@bot.event
+async def on_ready():
+    init_reminder()
+    channel = bot.get_channel(CHANNEL_ID)
+    print(f'Logged in as {bot.user}!')
+    print(f'Current reminder: {load_reminder()}')
+
+    if not channel:
+        print('Error: channel not found!')
+
+    # try:
+    #     synced = await bot.tree.sync(guild=GUILD_OBJ)
+    #     print(f'Synced {len(synced)} commands to guild {GUILD_OBJ.id}')
+    # except Exception as e:
+    #     print(f'Error occurred while syncing commands: {e}')
+        
+    # send_auto_reminder.start()
+
+
+@reminder.command(
+    name="view",
+    description="Privately see the reminder message (only visible to you)",
+    guild_ids=[GUILD_ID],
+)
 async def reminder_view(ctx: discord.ApplicationContext):
     await send_reminder(ctx, ephemeral=True)
 
-@reminder.command(name="edit", description="Edit a new reminder message")
+@reminder.command(name="edit", description="Edit a new reminder message", guild_ids=[GUILD_ID])
 async def reminder_edit(ctx: discord.ApplicationContext):
-    print("reminder_edit")
-    # modal = ReminderEditModal()
-    # modal.reminder_textarea.default = load_reminder()
-    # await interaction.response.send_modal(modal)
+    modal = ReminderEditModal(title="Edit the reminder message")
+    await ctx.send_modal(modal)
 
-@app_commands.command(name="post", description="Make the bot send the reminder as a message (⚠️ CAUTION! Visible to all! ⚠️)")
+@reminder.command(
+    name="post",
+    description="Make the bot send the reminder as a message (⚠️ CAUTION! Visible to all! ⚠️)",
+    guild_ids=[GUILD_ID]
+)
 async def reminder_post(ctx: discord.ApplicationContext):
     await send_reminder(ctx)
+    
 
+# @tasks.loop(minutes=1) # Check every minute
+# async def send_auto_reminder():
+#     now = datetime.now(timezone.utc)  # Current UTC time
 
-intents = discord.Intents.default()
-intents.message_content = True
-bot = Client(command_prefix="!", intents=intents)
+#     if now.weekday() == 1:  # (0=Monday, 1=Tuesday, ...)
+#         time_to_send = now.replace(hour=17, minute=0, second=0, microsecond=0) # set to 17:00 UTC (noon EST)
+#         if now >= time_to_send and now < time_to_send + timedelta(minutes=1): # sends the reminder *within the minute*
+#             channel = bot.get_channel(CHANNEL_ID)
+#             if channel:
+#                 send_reminder(automatic=True, channel=channel)
 
-@tasks.loop(minutes=1) # Check every minute
-async def send_reminder():
-    now = datetime.now(timezone.utc)  # Current UTC time
+# @send_reminder.after_loop
+# async def after_reminder():
+#     print(f"Reminder sent automatically at {datetime.now(timezone.utc)} UTC time.\n\nReminder:\n{load_reminder()}")
 
-    if now.weekday() == 1:  # (0=Monday, 1=Tuesday, ...)
-        time_to_send = now.replace(hour=17, minute=0, second=0, microsecond=0) # set to 17:00 UTC (noon EST)
-        if now >= time_to_send and now < time_to_send + timedelta(minutes=1): # sends the reminder *within the minute*
-            channel = bot.get_channel(CHANNEL_ID)
-            if channel:
-                send_reminder(automatic=True, channel=channel)
-
-@send_reminder.after_loop
-async def after_reminder():
-    print(f"Reminder sent automatically at {datetime.now(timezone.utc)} UTC time.\n\nReminder:\n{load_reminder()}")
-
-reminder_cmd = ReminderCommandGroup()
-bot.tree.add_command(reminder_cmd)
+# reminder_cmd = ReminderCommandGroup()
+# bot.tree.add_command(reminder_cmd)
 bot.run(TOKEN)
