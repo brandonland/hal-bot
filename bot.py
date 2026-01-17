@@ -207,15 +207,14 @@ def get_latest_bluray_news() -> discord.Embed:
     )
     embed.add_field(name="", value=f"Published: {published}", inline=False)
     embed.add_field(name="", value=desc, inline=False)
-    # if image:
-    #     embed.set_image(url=image)
-    # else:
-    #     print("no image found.")
-        
+    if "image" in entry:
+        embed.set_image(url=image)
+    else:
+        # TODO: get image via other means
+        pass
     return embed
         
     
-        
 
 # @bot.group(name="news", invoke_without_command=True, guild_ids=[GUILD_ID])
 @bot.slash_command(description="Fetch the news.", guild_ids=[GUILD_ID])
@@ -230,9 +229,6 @@ async def news(
     news_embed = await get_news(source)
     await ctx.send_response(f"Here is the latest news article from {source}:")
     await ctx.send_followup(embed=news_embed, ephemeral=ephemeral)
-
-# @news.command(name=)
-# async def
 
 
 @tasks.loop(minutes=1) # Check every minute
