@@ -1,11 +1,14 @@
 import os
 import asyncio
 import json
+import feedparser
 import discord
+from discord import option
 from discord.ext import commands, tasks
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import pprint
+from markdownify import markdownify
 
 import traceback
 
@@ -14,12 +17,14 @@ load_dotenv()
 
 TOKEN = os.getenv("TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
-GUILD_OBJ = discord.Object(id=GUILD_ID)
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 REMINDER_PATH = os.path.join(os.path.dirname(__file__), "reminder.json")
 EXAMPLE_REMINDER_PATH = os.path.join(os.path.dirname(__file__), "reminder.example.json")
 REMINDER_BANNER_PATH = "uploads/reminder-banner.jpg"
 REMINDER_BANNER_PATH_ABS = os.path.join(os.path.dirname(__file__), REMINDER_BANNER_PATH)
+NEWS_SOURCES = [
+    "blu-ray.com",
+]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -50,6 +55,9 @@ def update_reminder(message):
     data = {"reminder": message}
     with open("reminder.json", "w") as f:
         json.dump(data, f, indent=4)
+
+def init_news_store():
+    pass
 
 
 async def send_reminder(
@@ -117,10 +125,10 @@ class ReminderEditModal(discord.ui.DesignerModal):
     async def callback(self, inter: discord.Interaction):
         await inter.response.defer()
         await inter.followup.send("Reminder Set. Preview below:", ephemeral=True)
-        embed = discord.Embed(
-            description=self.children[0].item.value,
-            color=discord.Color.random(),
-        )
+        # embed = discord.Embed(
+        #     description=self.children[0].item.value,
+        #     color=discord.Color.random(),
+        # )
         update_reminder(self.text_input.item.value) # Update the reminder stored on disk
         await send_reminder(inter=inter, followup=True, ephemeral=True)
 
@@ -163,6 +171,68 @@ async def reminder_edit(ctx: discord.ApplicationContext, image: discord.Attachme
 )
 async def reminder_post(ctx: discord.ApplicationContext):
     await send_reminder(ctx)
+    
+    
+# TODO: Autocomplete news sources
+
+async def get_news_source(ctx: discord.AutocompleteContext):
+    return NEWS_SOURCES
+
+    
+async def get_news(source: str) -> discord.Embed | None:
+    if source not in NEWS_SOURCES:
+        ctx.send_response(f"Sorry, that news source {source} is unknown to me.")
+        
+    if source == "blu-ray.com":
+        # print(f"title is {title}")
+        # pprint.pprint(f"item 1 is {p.entries[0]}")
+        # print(f"number of items: {len(p.entries)}")
+
+        return get_latest_bluray_news()
+    
+        
+def get_latest_bluray_news() -> discord.Embed:
+    p = feedparser.parse("https://www.blu-ray.com/rss/newsfeed.xml")
+    entry = p.entries[0]
+    title = entry.title
+    desc = markdownify(entry.description)
+    published = entry.published
+    # image = entry.image | None
+    link = entry.link
+    summary = entry.summary
+
+    embed = discord.Embed(
+        title=title,
+        color=discord.Color.random(),
+    )
+    embed.add_field(name="", value=f"Published: {published}", inline=False)
+    embed.add_field(name="", value=desc, inline=False)
+    # if image:
+    #     embed.set_image(url=image)
+    # else:
+    #     print("no image found.")
+        
+    return embed
+        
+    
+        
+
+# @bot.group(name="news", invoke_without_command=True, guild_ids=[GUILD_ID])
+@bot.slash_command(description="Fetch the news.", guild_ids=[GUILD_ID])
+@option("source", description="Choose a news source", choices=NEWS_SOURCES)
+async def news(
+    ctx: discord.ApplicationContext,
+    source: str,
+    private: bool=False,
+):
+    ephemeral = True if private else False
+
+    news_embed = await get_news(source)
+    await ctx.send_response(f"Here is the latest news article from {source}:")
+    await ctx.send_followup(embed=news_embed, ephemeral=ephemeral)
+
+# @news.command(name=)
+# async def
 
 
 @tasks.loop(minutes=1) # Check every minute
@@ -177,6 +247,7 @@ async def send_auto_reminder():
                 await send_reminder(automatic=True, channel=channel)
             else:
                 print("Error: channel not found")
+
 
 send_auto_reminder.start()
 bot.run(TOKEN)

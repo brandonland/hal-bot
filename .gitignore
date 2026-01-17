@@ -1,4 +1,5 @@
-reminder.json
 .venv/
-uploads/
 .env
+reminder.json
+uploads/
+latest-news.json
