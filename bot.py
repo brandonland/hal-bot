@@ -12,12 +12,10 @@ from markdownify import markdownify
 import requests
 from bs4 import BeautifulSoup
 import re
+import random
 
-# from lxml import etree
 from lxml import html
 from lxml.cssselect import CSSSelector
-# from cssselect import Selector
-# from cssselect import HTMLTranslator, SelectorError
 
 import traceback
 
@@ -31,16 +29,13 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 EXAMPLE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.example.json")
 REMINDER_BANNER_PATH = "uploads/reminder-banner.jpg"
 REMINDER_BANNER_PATH_ABS = os.path.join(os.path.dirname(__file__), REMINDER_BANNER_PATH)
-NEWS_SOURCES = [
-    "blu-ray.com",
-]
+NEWS_SOURCES = ["blu-ray.com"]
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(intents=intents)
 
 dvduesday = bot.create_group("dvd", "DVDuesday reminder commands", guild_ids=[GUILD_ID])
-# dvd_edit = dvduesday.subgroup("edit", "Edit reminder", guild_ids=[GUILD_ID])
 
 
 def init_config():
@@ -197,8 +192,6 @@ async def reminder_post(ctx: discord.ApplicationContext):
     await send_reminder(ctx)
     
     
-# TODO: Autocomplete news sources
-
 async def get_news_source(ctx: discord.AutocompleteContext):
     return NEWS_SOURCES
 
@@ -275,16 +268,25 @@ def get_latest_bluray_news() -> discord.Embed:
         
 async def get_news(source: str) -> discord.Embed | None:
     if source not in NEWS_SOURCES:
-        ctx.send_response(f"Sorry, that news source {source} is unknown to me.")
+        ctx.send_response(f"Sorry, the news source {source} is unknown to me.")
         
     if source == "blu-ray.com":
         return get_latest_bluray_news()
     
+def generate_news_message() -> str:
+    message_options = [
+        "## Blu-ray.com NEWS 📰",
+        "## EXTRA EXTRA!!",
+        "## This just in!"
+    ]
+    return random.choice(message_options)
+    
 async def send_br_news(channel: None):
+    msg = generate_news_message()
     url = get_latest_bluray_url()
     embed = get_latest_bluray_news()
     if channel:
-        await channel.send("A new article recently dropped from blu-ray.com:")
+        await channel.send(msg)
         await channel.send(embed=embed)
         if url is not None:
             update_latest_br_news_url(url)
@@ -297,7 +299,8 @@ async def brnews(
 ):
     source = "blu-ray.com"
     news_embed = await get_news(source)
-    await ctx.send_response(f"Here is the latest news article from {source}:")
+    msg = generate_news_message()
+    await ctx.send_response(msg)
     await ctx.send_followup(embed=news_embed)
 
 
