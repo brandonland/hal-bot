@@ -4,7 +4,7 @@ Work in progress.
 
 ## Initial Setup
 1. Copy `.env.example` file to `.env`, and add your credentials, including token, channel ID, etc.
-2. Copy `reminder.example.json` to `reminder.json`. Add your custom reminder message to it, or change it later with a slash command.
+2. Copy `config.example.json` to `config.json`. Add your custom reminder message to it, or change it later with a slash command.
 
 ### Using venv
 1. Clone the repo: `git clone https://github.com/brandonland/discord-reminder-bot.git`

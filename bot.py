@@ -27,8 +27,8 @@ load_dotenv()
 TOKEN = os.getenv("TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-REMINDER_PATH = os.path.join(os.path.dirname(__file__), "reminder.json")
-EXAMPLE_REMINDER_PATH = os.path.join(os.path.dirname(__file__), "reminder.example.json")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+EXAMPLE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.example.json")
 REMINDER_BANNER_PATH = "uploads/reminder-banner.jpg"
 REMINDER_BANNER_PATH_ABS = os.path.join(os.path.dirname(__file__), REMINDER_BANNER_PATH)
 NEWS_SOURCES = [
@@ -39,35 +39,50 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(intents=intents)
 
-reminder = bot.create_group("reminder", "Reminder commands", guild_ids=[GUILD_ID])
-reminder_edit = reminder.subgroup("edit", "Edit reminder", guild_ids=[GUILD_ID])
+dvduesday = bot.create_group("dvd", "DVDuesday reminder commands", guild_ids=[GUILD_ID])
+# dvd_edit = dvduesday.subgroup("edit", "Edit reminder", guild_ids=[GUILD_ID])
 
 
-def init_reminder():
-    if not os.path.exists(REMINDER_PATH):
-        with open(EXAMPLE_REMINDER_PATH, "r") as f:
-            example_data = json.load(f)
-        with open(REMINDER_PATH, "w") as f:
-            json.dump(example_data, f, indent=4)
-
+def init_config():
+    if not os.path.exists(CONFIG_PATH):
+        with open(EXAMPLE_CONFIG_PATH, "r") as file:
+            example_data = json.load(file)
+        with open(CONFIG_PATH, "w") as file:
+            json.dump(example_data, file, indent=4)
 
 def load_reminder():
     try:
-        with open("reminder.json", "r") as f:
-            data = json.load(f)
+        with open("config.json", "r") as file:
+            data = json.load(file)
             return data.get("reminder", "Default reminder")
     except (FileNotFoundError, json.JSONDecodeError):
-        return "# DVDuesday Reminder (file not found error!)"
-
+        return "config file not found!"
 
 def update_reminder(message):
-    data = {"reminder": message}
-    with open("reminder.json", "w") as f:
-        json.dump(data, f, indent=4)
+    with open("config.json", "r") as file:
+        data = json.load(file)
 
-def init_news_store():
-    pass
+    data["reminder"] = message
 
+    with open("config.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+def update_latest_br_news_url(url: str):
+    with open("config.json", "r") as file:
+        data = json.load(file)
+
+    data["br_news"] = url
+
+    with open("config.json", "w") as file:
+        json.dump(data, file, indent=4)
+
+def load_latest_br_news_url():
+    try:
+        with open("config.json", "r") as file:
+            data = json.load(file)
+            return data.get("br_news")
+    except (FileNotFoundError, json.JSONDecodeError):
+        return "config file not found!"
 
 async def send_reminder(
     ctx: discord.ApplicationContext = None,
@@ -144,7 +159,7 @@ class ReminderEditModal(discord.ui.DesignerModal):
 
 @bot.event
 async def on_ready():
-    init_reminder()
+    init_config()
     channel = bot.get_channel(CHANNEL_ID)
     print(f"Logged in as {bot.user}!")
     print(f"Current reminder: {load_reminder()}")
@@ -153,7 +168,7 @@ async def on_ready():
         print("Error: channel not found!")
 
 
-@reminder.command(
+@dvduesday.command(
     name="view",
     description="(Only visible to you) See the reminder message",
 )
@@ -161,7 +176,7 @@ async def reminder_view(ctx: discord.ApplicationContext):
     await send_reminder(ctx, ephemeral=True)
 
 
-@reminder.command(
+@dvduesday.command(
     name="edit", description="Edit a new reminder message"
 )
 async def reminder_edit(ctx: discord.ApplicationContext, image: discord.Attachment=None):
@@ -174,7 +189,7 @@ async def reminder_edit(ctx: discord.ApplicationContext, image: discord.Attachme
         await ctx.send_modal(modal)
 
 # TODO: have a confirm/prompt modal: "Are you sure you want to...?"
-@reminder.command(
+@dvduesday.command(
     name="post",
     description="Manually announce the reminder in this channel (⚠️ CAUTION! Visible to all! ⚠️)",
 )
@@ -187,7 +202,7 @@ async def reminder_post(ctx: discord.ApplicationContext):
 async def get_news_source(ctx: discord.AutocompleteContext):
     return NEWS_SOURCES
 
-def scrape_bluray(url: str, t: str="image") -> str | None:
+def scrape_bluray_for_image(url: str, t: str="image") -> str | None:
     """
     Given the url of the post, returns featured image.
 
@@ -206,7 +221,7 @@ def scrape_bluray(url: str, t: str="image") -> str | None:
     elif t == "thumb":
         selector = CSSSelector("img:not(.cover)")
     else:
-        raise("Error: incorrect type passed to scrape_bluray")
+        raise("Error: incorrect type passed to scrape_bluray_for_image")
 
     images = selector(tree)
     
@@ -223,7 +238,10 @@ def scrape_bluray(url: str, t: str="image") -> str | None:
             if "/news/icons" in src:
                 return src
 
-
+def get_latest_bluray_url() -> str:
+    p = feedparser.parse("https://www.blu-ray.com/rss/newsfeed.xml")
+    entry = p.entries[0]
+    return entry.link
         
 def get_latest_bluray_news() -> discord.Embed:
     p = feedparser.parse("https://www.blu-ray.com/rss/newsfeed.xml")
@@ -234,8 +252,8 @@ def get_latest_bluray_news() -> discord.Embed:
     # image = entry.image | None
     link = entry.link
     summary = entry.summary
-    img_link = scrape_bluray(link)
-    thumb_link = scrape_bluray(link, "thumb")
+    img_link = scrape_bluray_for_image(link)
+    thumb_link = scrape_bluray_for_image(link, "thumb")
 
     embed = discord.Embed(
         title=title,
@@ -258,24 +276,27 @@ async def get_news(source: str) -> discord.Embed | None:
     if source == "blu-ray.com":
         return get_latest_bluray_news()
     
+async def send_br_news(channel: None):
+    url = get_latest_bluray_url()
+    embed = get_latest_bluray_news()
+    if channel:
+        await channel.send(embed=embed)
+        update_latest_br_news_url(url)
+    
 
 # @bot.group(name="news", invoke_without_command=True, guild_ids=[GUILD_ID])
-@bot.slash_command(description="Fetch the news.", guild_ids=[GUILD_ID])
-@option("source", description="Choose a news source", choices=NEWS_SOURCES)
-async def news(
+@bot.slash_command(description="Manually fetch the news. Posts publicly!", guild_ids=[GUILD_ID])
+async def brnews(
     ctx: discord.ApplicationContext,
-    source: str,
-    private: bool=False,
 ):
-    ephemeral = True if private else False
-
+    source = "blu-ray.com"
     news_embed = await get_news(source)
     await ctx.send_response(f"Here is the latest news article from {source}:")
-    await ctx.send_followup(embed=news_embed, ephemeral=ephemeral)
+    await ctx.send_followup(embed=news_embed)
 
 
 @tasks.loop(minutes=1) # Check every minute
-async def send_auto_reminder():
+async def auto_reminder():
     now = datetime.now(timezone.utc)
     if now.weekday() == 1:  # (0=Monday, 1=Tuesday, ...)
         time_to_send = now.replace(hour=17, minute=0, second=0, microsecond=0) # set to 17:00 UTC (noon EST)
@@ -290,6 +311,17 @@ async def send_auto_reminder():
 
 # TODO: Check every hour if a new post to blu-ray.com was posted.
 #       If there is a new post, post it in specified channel.
+@tasks.loop(minutes=1)
+async def auto_br_news():
+    now = datetime.now(timezone.utc)
+    if now.minute == 0 or now.minute == 30: # check 2x per hour
+        latest_url = get_latest_bluray_url()
+        if latest_url != load_latest_br_news_url():
+            channel = bot.get_channel(CHANNEL_ID)
+            print("Sending blu-ray news...")
+            await send_br_news(channel=channel)
 
-send_auto_reminder.start()
+auto_reminder.start()
+auto_br_news.start()
+
 bot.run(TOKEN)
