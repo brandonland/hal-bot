@@ -1,6 +1,12 @@
-# Discord Reminder Bot
+# Hal Bot
 
+A discord bot with various functionality. 
 Work in progress.
+
+Current functionality:
+- reminder commands & automatic weekly reminder
+- blu-ray.com scraper & automatic posting an embed of the latest news post in a channel. It posts only if a new article came out. It stores a "latest url" and compares.
+- possibly more planned
 
 ## Initial Setup
 1. Copy `.env.example` file to `.env`, and add your credentials, including token, channel ID, etc.
@@ -27,7 +33,8 @@ For the moment, the reminder interval and time are hardcoded. The reminder time 
 
 ## Usage
 There are 3 slash commands:
-- `/reminder view`: This command privately echoes back what the reminder is set to. This is only visible to you.
-- `/reminder edit`: This opens up a large text input modal with the current reminder message to be edited.
-  - `/reminder edit image`: Upload new banner image or change the existing one.
-- `/reminder post`: This command manually forces the bot to write the reminder as a message in the channel. This is visible to everyone.
+- `/dvd view`: This command privately echoes back what the reminder is set to. This is only visible to you.
+- `/dvd edit`: This opens up a large text input modal with the current reminder message to be edited.
+  - `/dvd edit image`: Upload new banner image or change the existing one.
+- `/dvd post`: This command manually forces the bot to write the reminder as a message in the channel. This is visible to everyone.
+- `/brnews`: Manually pull the latest blu-ray.com news post in the current channel.
