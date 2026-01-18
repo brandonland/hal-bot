@@ -15,6 +15,7 @@ import re
 import random
 
 from lxml import html
+from lxml import etree
 from lxml.cssselect import CSSSelector
 
 import traceback
@@ -203,33 +204,30 @@ def scrape_bluray_for_image(url: str, t: str="image") -> str | None:
     the image is omitted while the thumbnail remains, so the return value must
     optionally allow a `None` type, in case no image was found.)
     
-    Pass type="thumb" as an argument to scrape the thumbnail instead. 
+    Pass t="thumb" as an argument to scrape the thumbnail instead. 
     """
     
     response = requests.get(url)
-    tree = html.fromstring(response.content)
+    html_content = response.text
+    soup = BeautifulSoup(html_content, "html.parser")
 
     if t == "image":
-        selector = CSSSelector("div > a img:not(.cover)")
-    elif t == "thumb":
-        selector = CSSSelector("img:not(.cover)")
-    else:
-        raise("Error: incorrect type passed to scrape_bluray_for_image")
-
-    images = selector(tree)
-    
-    if t == "image":
-        image_sources = [img.get('src') for img in images if img.get('src') and img.get('src').endswith('.jpg')]
-        if image_sources:
-            return image_sources[0]
-        else:
+        link_rel_image_src = soup.css.select("link[rel='image_src']")
+        if len(link_rel_image_src) >= 1:
+            return link_rel_image_src[0]["href"]
+        if not link_rel_image_src:
             return None
-    
-    if t == "thumb":
-        for img in images:
-            src = img.get('src')
+
+    elif t == "thumb":
+        thumb_elements = soup.css.select("img:not(.cover)")
+        for img in thumb_elements:
+            src = img.get("src")
             if "/news/icons" in src:
                 return src
+        return None
+    else:
+        raise("Error: incorrect type passed to scrape_bluray_for_image")
+    
 
 def get_latest_bluray_url() -> str | None:
     p = feedparser.parse("https://www.blu-ray.com/rss/newsfeed.xml")
@@ -273,7 +271,7 @@ async def get_news(source: str) -> discord.Embed | None:
     if source == "blu-ray.com":
         return get_latest_bluray_news()
     
-def generate_news_message() -> str:
+async def generate_news_message() -> str:
     message_options = [
         "## Blu-ray.com NEWS 📰",
         "## EXTRA EXTRA!!",
@@ -297,10 +295,12 @@ async def send_br_news(channel: None):
 async def brnews(
     ctx: discord.ApplicationContext,
 ):
+    await ctx.response.defer()
     source = "blu-ray.com"
     news_embed = await get_news(source)
-    msg = generate_news_message()
-    await ctx.send_response(msg)
+    msg = await generate_news_message()
+    # await ctx.send_response(msg)
+    await ctx.respond(msg)
     await ctx.send_followup(embed=news_embed)
 
 
