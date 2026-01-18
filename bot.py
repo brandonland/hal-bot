@@ -27,8 +27,8 @@ load_dotenv()
 TOKEN = os.getenv("TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-REMINDER_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-EXAMPLE_REMINDER_PATH = os.path.join(os.path.dirname(__file__), "config.example.json")
+REMINDER_PATH = os.path.join(os.path.dirname(__file__), "reminder.json")
+EXAMPLE_REMINDER_PATH = os.path.join(os.path.dirname(__file__), "reminder.example.json")
 REMINDER_BANNER_PATH = "uploads/reminder-banner.jpg"
 REMINDER_BANNER_PATH_ABS = os.path.join(os.path.dirname(__file__), REMINDER_BANNER_PATH)
 NEWS_SOURCES = [
@@ -53,7 +53,7 @@ def init_reminder():
 
 def load_reminder():
     try:
-        with open("config.json", "r") as f:
+        with open("reminder.json", "r") as f:
             data = json.load(f)
             return data.get("reminder", "Default reminder")
     except (FileNotFoundError, json.JSONDecodeError):
@@ -62,7 +62,7 @@ def load_reminder():
 
 def update_reminder(message):
     data = {"reminder": message}
-    with open("config.json", "w") as f:
+    with open("reminder.json", "w") as f:
         json.dump(data, f, indent=4)
 
 def init_news_store():
@@ -261,27 +261,17 @@ async def get_news(source: str) -> discord.Embed | None:
 
 # @bot.group(name="news", invoke_without_command=True, guild_ids=[GUILD_ID])
 @bot.slash_command(description="Fetch the news.", guild_ids=[GUILD_ID])
-# @option("source", description="Choose a news source", choices=NEWS_SOURCES)
-# @option("private", "Whether or not to make it be hidden to check privately.")
-async def brnews(
+@option("source", description="Choose a news source", choices=NEWS_SOURCES)
+async def news(
     ctx: discord.ApplicationContext,
+    source: str,
     private: bool=False,
 ):
-    ephemeral = private
-    source = "blu-ray.com" # hard-coded for now
+    ephemeral = True if private else False
+
     news_embed = await get_news(source)
     await ctx.send_response(f"Here is the latest news article from {source}:")
     await ctx.send_followup(embed=news_embed, ephemeral=ephemeral)
-# async def news(
-#     ctx: discord.ApplicationContext,
-#     source: str,
-#     private: bool=False,
-# ):
-#     ephemeral = True if private else False
-
-#     news_embed = await get_news(source)
-#     await ctx.send_response(f"Here is the latest news article from {source}:")
-#     await ctx.send_followup(embed=news_embed, ephemeral=ephemeral)
 
 
 @tasks.loop(minutes=1) # Check every minute
