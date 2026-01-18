@@ -238,10 +238,14 @@ def scrape_bluray_for_image(url: str, t: str="image") -> str | None:
             if "/news/icons" in src:
                 return src
 
-def get_latest_bluray_url() -> str:
+def get_latest_bluray_url() -> str | None:
     p = feedparser.parse("https://www.blu-ray.com/rss/newsfeed.xml")
-    entry = p.entries[0]
-    return entry.link
+    try:
+        entry = p.entries[0]
+        return entry.link
+    except IndexError:
+        print("No entries found in the feed!")
+        return None
         
 def get_latest_bluray_news() -> discord.Embed:
     p = feedparser.parse("https://www.blu-ray.com/rss/newsfeed.xml")
@@ -280,8 +284,10 @@ async def send_br_news(channel: None):
     url = get_latest_bluray_url()
     embed = get_latest_bluray_news()
     if channel:
+        await channel.send("A new article recently dropped from blu-ray.com:")
         await channel.send(embed=embed)
-        update_latest_br_news_url(url)
+        if url is not None:
+            update_latest_br_news_url(url)
     
 
 # @bot.group(name="news", invoke_without_command=True, guild_ids=[GUILD_ID])
@@ -316,6 +322,9 @@ async def auto_br_news():
     now = datetime.now(timezone.utc)
     if now.minute == 0 or now.minute == 30: # check 2x per hour
         latest_url = get_latest_bluray_url()
+        if latest_url is None:
+            print("latest url could not be fetched.")
+            return
         if latest_url != load_latest_br_news_url():
             channel = bot.get_channel(CHANNEL_ID)
             print("Sending blu-ray news...")
