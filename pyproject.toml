@@ -1,7 +1,7 @@
 [project]
-name = "discord-reminder-bot"
-version = "1.4.1"
-description = "Add your description here"
+name = "hal-bot"
+version = "1.5.5"
+description = "A discord bot that provides blu-ray.com news as well as arbitrary reminders"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
