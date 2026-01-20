@@ -12,7 +12,6 @@ from markdownify import markdownify
 import requests
 from bs4 import BeautifulSoup
 import re
-import random
 
 from lxml import html
 from lxml import etree
@@ -271,16 +270,8 @@ async def get_news(source: str) -> discord.Embed | None:
     if source == "blu-ray.com":
         return get_latest_bluray_news()
     
-async def generate_news_message() -> str:
-    message_options = [
-        "## Blu-ray.com NEWS 📰",
-        "## EXTRA EXTRA!!",
-        "## This just in!"
-    ]
-    return random.choice(message_options)
-    
 async def send_br_news(channel: None):
-    msg = await generate_news_message()
+    msg = "### Blu-ray.com NEWS 📰"
     url = get_latest_bluray_url()
     embed = get_latest_bluray_news()
     if channel:
@@ -295,13 +286,9 @@ async def send_br_news(channel: None):
 async def brnews(
     ctx: discord.ApplicationContext,
 ):
-    await ctx.response.defer()
     source = "blu-ray.com"
     news_embed = await get_news(source)
-    msg = await generate_news_message()
-    # await ctx.send_response(msg)
-    await ctx.respond(msg)
-    await ctx.send_followup(embed=news_embed)
+    await ctx.send_response(embed=news_embed)
 
 
 @tasks.loop(minutes=1) # Check every minute
